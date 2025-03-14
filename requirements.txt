@@ -1,0 +1,10 @@
+Spire.Doc
+md2pdf
+markdown2
+weasyprint
+beautifulsoup4
+pdfkit
+requests
+xhtml2pdf
+beautifulsoup4
+reportlab
