@@ -23,9 +23,32 @@ LANGCHAIN_API_KEY = os.getenv('LANGCHAIN_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
+# Add these configurations at the beginning of the file, after the environment variables
 
-#Variables para crear la historia de forma dinamica
-theme = "Quantum entanglement" #Robots, Animals SciFi etc
+# Story Configuration
+class StoryConfig:
+    def __init__(self):
+        self.theme = "Quantum entanglement"  # Default theme
+        self.num_chapters = 5  # Default number of chapters
+        self.words_per_chapter = 100  # Default words per chapter
+
+# Create a global config instance
+story_config = StoryConfig()
+
+def configure_story(theme=None, num_chapters=None, words_per_chapter=None):
+    """
+    Configure story parameters
+    Args:
+        theme (str): Theme of the story
+        num_chapters (int): Number of chapters
+        words_per_chapter (int): Words per chapter
+    """
+    if theme:
+        story_config.theme = theme
+    if num_chapters:
+        story_config.num_chapters = num_chapters
+    if words_per_chapter:
+        story_config.words_per_chapter = words_per_chapter
 
 
 
@@ -156,7 +179,7 @@ def convermarkdowntopdf(markdownfile_name: str) -> str:
     from datetime import datetime
     
     date_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output_file = os.path.splitext(markdownfile_name)[0] + theme + "-" + date_now + '.pdf'
+    output_file = os.path.splitext(markdownfile_name)[0] + story_config.theme + "-" + date_now + '.pdf'
     
     # Leer el contenido del Markdown
     with open(markdownfile_name, 'r', encoding='utf-8') as md_file:
@@ -273,14 +296,14 @@ def newconvermarkdowntopdf(markdownfile_name: str) -> str:
 
     date_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # Formato: YYYY-MM-DD_HH-MM-SS
 
-    output_file = os.path.splitext(markdownfile_name)[0] + theme + "-" + date_now + '.pdf'
+    output_file = os.path.splitext(markdownfile_name)[0] + story_config.theme + "-" + date_now + '.pdf'
 
     with open(markdownfile_name, 'r', encoding='utf-8') as md_file:
             markdown_content = md_file.read()
 
     #--------------------
     pdf = MarkdownPdf(toc_level=2)
-    pdf.meta["title"] = theme
+    pdf.meta["title"] = story_config.theme
     pdf.add_section(Section(markdown_content, toc=False))
     pdf.save(output_file)
 
@@ -291,31 +314,31 @@ def newconvermarkdowntopdf(markdownfile_name: str) -> str:
 
 
 story_outliner = Agent(
-  role='Story Outliner',
-  goal=f"Develop an outline for a children\'s storybook about {theme}, including chapter titles and characters for 5 chapters.",
-  backstory="An imaginative creator who lays the foundation of captivating stories for children.",
-  verbose=True,
-  llm=llm,
-  allow_delegation=False
+    role='Story Outliner',
+    goal=f"Develop an outline for a children's storybook about {story_config.theme}, including chapter titles and characters for {story_config.num_chapters} chapters.",
+    backstory="An imaginative creator who lays the foundation of captivating stories for children.",
+    verbose=True,
+    llm=llm,
+    allow_delegation=False
 )
 
 story_writer = Agent(
-  role='Story Writer',
-  goal='Write the full content of the story for all 5 chapters, each chapter 100 words, weaving together the narratives and characters outlined.',
-  backstory="A talented storyteller who brings to life the world and characters outlined, crafting engaging and imaginative tales for children.",
-  verbose=True,
-  llm=llm,
-  allow_delegation=False
+    role='Story Writer',
+    goal=f'Write the full content of the story for all {story_config.num_chapters} chapters, each chapter {story_config.words_per_chapter} words, weaving together the narratives and characters outlined.',
+    backstory="A talented storyteller who brings to life the world and characters outlined, crafting engaging and imaginative tales for children.",
+    verbose=True,
+    llm=llm,
+    allow_delegation=False
 )
 
 image_generator = Agent(
-  role='Image Generator',
-  goal='Generate one image per chapter content provided by the story outliner. Start with Chapter number, chapter content, character details, detailed location information and detailed items in the location where the activity happens. Generate totally 5 images one by one. Final output should contain all the 5 images in json format.',
-  backstory="A creative AI specialized in visual storytelling, bringing each chapter to life through imaginative imagery.",
-  verbose=True,
-  llm=llm,
-  tools=[generateimage],
-  allow_delegation=False
+    role='Image Generator',
+    goal=f'Generate one image per chapter content provided by the story outliner. Start with Chapter number, chapter content, character details, detailed location information and detailed items in the location where the activity happens. Generate totally {story_config.num_chapters} images one by one. Final output should contain all the {story_config.num_chapters} images in json format.',
+    backstory="A creative AI specialized in visual storytelling, bringing each chapter to life through imaginative imagery.",
+    verbose=True,
+    llm=llm,
+    tools=[generateimage],
+    allow_delegation=False
 )
 
 content_formatter = Agent(
@@ -341,21 +364,21 @@ markdown_to_pdf_creator = Agent(
 
 # Create tasks for the agents
 task_outline = Task(
-    description=f"Create an outline for the children\'s storybook about {theme}, detailing chapter titles and character descriptions for 5 chapters.",
+    description=f"Create an outline for the children's storybook about {story_config.theme}, detailing chapter titles and character descriptions for {story_config.num_chapters} chapters.",
     agent=story_outliner,
-    expected_output='A structured outline document containing 5 chapter titles, with detailed character descriptions and the main plot points for each chapter.'
+    expected_output=f'A structured outline document containing {story_config.num_chapters} chapter titles, with detailed character descriptions and the main plot points for each chapter.'
 )
 
 task_write = Task(
-    description='Using the outline provided, write the full story content for all chapters, ensuring a cohesive and engaging narrative for children. Each Chapter 100 words. Include Title of the story at the top.',
+    description=f'Using the outline provided, write the full story content for all chapters, ensuring a cohesive and engaging narrative for children. Each Chapter {story_config.words_per_chapter} words. Include Title of the story at the top.',
     agent=story_writer,
-    expected_output=f"A complete manuscript of the children\'s storybook about {theme} with 5 chapters. Each chapter should contain approximately 100 words, following the provided outline and integrating the characters and plot points into a cohesive narrative."
+    expected_output=f"A complete manuscript of the children's storybook about {story_config.theme} with {story_config.num_chapters} chapters. Each chapter should contain approximately {story_config.words_per_chapter} words, following the provided outline and integrating the characters and plot points into a cohesive narrative."
 )
 
 task_image_generate = Task(
-    description=f"Generate 5 images that captures the essence of the children\'s storybook about {theme}, aligning with the themes, characters, and narrative outlined for the chapters. Do it one by one.",
+    description=f"Generate {story_config.num_chapters} images that captures the essence of the children's storybook about {story_config.theme}, aligning with the themes, characters, and narrative outlined for the chapters. Do it one by one.",
     agent=image_generator,
-    expected_output='A digital image file that visually represents the overarching theme of the children\'s storybook, incorporating elements from the characters and plot as described in the outline. The image should be suitable for inclusion in the storybook as an illustration.',
+    expected_output=f'A digital image file that visually represents the overarching theme of the children\'s storybook, incorporating elements from the characters and plot as described in the outline. The image should be suitable for inclusion in the storybook as an illustration.',
 )
 
 task_format_content = Task(
@@ -372,14 +395,33 @@ task_markdown_to_pdf = Task(
     expected_output='A PDF file generated from the Markdown input, accurately reflecting the content with proper formatting. The PDF should be ready for sharing or printing.'
 )
 
-crew = Crew(
-  agents=[story_outliner, story_writer, image_generator, content_formatter, markdown_to_pdf_creator],
-  tasks=[task_outline, task_write, task_image_generate, task_format_content, task_markdown_to_pdf],
-  verbose=True,
-  process=Process.sequential
-)
+def generate_story(theme=None, num_chapters=None, words_per_chapter=None):
+    """
+    Generate a story with custom parameters
+    Args:
+        theme (str): Theme of the story
+        num_chapters (int): Number of chapters
+        words_per_chapter (int): Words per chapter
+    Returns:
+        str: Result of the story generation process
+    """
+    configure_story(theme, num_chapters, words_per_chapter)
+    
+    crew = Crew(
+        agents=[story_outliner, story_writer, image_generator, content_formatter, markdown_to_pdf_creator],
+        tasks=[task_outline, task_write, task_image_generate, task_format_content, task_markdown_to_pdf],
+        verbose=True,
+        process=Process.sequential
+    )
+    
+    return crew.kickoff()
 
-result = crew.kickoff()
-
-print(result)
+if __name__ == "__main__":
+    # Example usage
+    result = generate_story(
+        theme="Space Adventure",
+        num_chapters=10,
+        words_per_chapter=50
+    )
+    print(result)
 
