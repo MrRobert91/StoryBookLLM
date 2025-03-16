@@ -27,10 +27,51 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
 # Story Configuration
 class StoryConfig:
+    _instance = None  # Singleton instance
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self):
-        self.theme = "Quantum entanglement"  # Default theme
-        self.num_chapters = 5  # Default number of chapters
-        self.words_per_chapter = 100  # Default words per chapter
+        if not self._initialized:
+            self._theme = "universo fractal"
+            self._num_chapters = 5
+            self._words_per_chapter = 50
+            self._initialized = True
+            print(f"StoryConfig initialized with theme: {self._theme}")
+
+    @property
+    def theme(self):
+        return self._theme
+
+    @theme.setter
+    def theme(self, value):
+        if value and isinstance(value, str):
+            print(f"Updating theme from '{self._theme}' to '{value}'")
+            self._theme = value
+
+    @property
+    def num_chapters(self):
+        return self._num_chapters
+
+    @num_chapters.setter
+    def num_chapters(self, value):
+        if value and isinstance(value, int):
+            self._num_chapters = value
+            print(f"Chapters updated to: {self._num_chapters}")
+
+    @property
+    def words_per_chapter(self):
+        return self._words_per_chapter
+
+    @words_per_chapter.setter
+    def words_per_chapter(self, value):
+        if value and isinstance(value, int):
+            self._words_per_chapter = value
+            print(f"Words per chapter updated to: {self._words_per_chapter}")
 
 # Create a global config instance
 story_config = StoryConfig()
@@ -43,14 +84,36 @@ def configure_story(theme=None, num_chapters=None, words_per_chapter=None):
         num_chapters (int): Number of chapters
         words_per_chapter (int): Words per chapter
     """
-    if theme:
+    print("\n=== Configuring Story ===")
+    print(f"Current theme: {story_config.theme}")
+    print(f"New theme requested: {theme}")
+    
+    if theme is not None:
         story_config.theme = theme
-    if num_chapters:
+    if num_chapters is not None:
         story_config.num_chapters = num_chapters
-    if words_per_chapter:
+    if words_per_chapter is not None:
         story_config.words_per_chapter = words_per_chapter
+    
+    print(f"Final theme: {story_config.theme}")
+    return story_config
 
-
+def create_story_folder(theme):
+    """
+    Creates a folder structure for storing story files
+    Returns the path to the new story folder
+    """
+    base_folder = "CuentosGenerados"
+    date_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # Clean theme name for folder name
+    clean_theme = re.sub(r'[^a-zA-Z0-9_]', '_', theme)
+    story_folder = f"{clean_theme}_{date_now}"
+    full_path = os.path.join(os.getcwd(), base_folder, story_folder)
+    
+    # Create folders if they don't exist
+    os.makedirs(full_path, exist_ok=True)
+    
+    return full_path
 
 llm = ChatOpenAI(
     openai_api_base="https://api.openai.com/v1", # https://api.openai.com/v1 or https://api.groq.com/openai/v1 
@@ -70,6 +133,8 @@ dalle_tool = DallETool(model="dall-e-3",
                        size="1024x1024",
                        quality="standard",
                        n=1)
+
+'''
 
 
 @tool
@@ -117,14 +182,12 @@ def generateimageold(chapter_content_and_character_details: str) -> str:
         return ""
 
     return filepath
-
+'''
 
 @tool
 def generateimage(chapter_content_and_character_details: str | dict) -> str:
     """
-    Generates an image for a given chapter number, chapter content, detailed location details and character details.
-    Using the OpenAI image generation API,
-    saves it in the current folder, and returns the image path.
+    Generates an image for a given chapter and saves it in the story folder
     """
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -137,7 +200,18 @@ def generateimage(chapter_content_and_character_details: str | dict) -> str:
     print(type(content))
     print(content)
 
-    dalle_prompt = f"Image is about: {content}. Style: Illustration. Create an illustration incorporating a vivid palette with an emphasis on shades of azure and emerald, augmented by splashes of gold for contrast and visual interest. The style should evoke the intricate detail and whimsy of early 20th-century storybook illustrations, blending realism with fantastical elements to create a sense of wonder and enchantment. The composition should be rich in texture, with a soft, luminous lighting that enhances the magical atmosphere. Attention to the interplay of light and shadow will add depth and dimensionality, inviting the viewer to delve into the scene. DON'T include ANY text in this image. DON'T include colour palettes in this image."
+    dalle_prompt = f"""La imagen trata sobre: {content}. 
+    Estilo: Ilustración infantil tipo dibujos animados 2D. 
+    Crear una ilustración con un estilo limpio y amigable para niños, utilizando:
+    - Líneas definidas y claras como en los dibujos animados
+    - Colores brillantes pero planos, sin degradados complejos
+    - Formas simples y reconocibles
+    - Personajes expresivos con rasgos exagerados
+    - Fondos simplificados pero atractivos
+    - Estilo similar a series animadas modernas como Adventure Time o Gravity Falls
+    El diseño debe ser alegre y atractivo para niños, manteniendo un aspecto moderno y divertido.
+    NO incluir elementos realistas complejos.
+    Mantener un estilo consistente de dibujos animados en toda la imagen."""
 
     print("--- dalle_prompt ----")
     print(dalle_prompt)
@@ -154,7 +228,10 @@ def generateimage(chapter_content_and_character_details: str | dict) -> str:
     words = content.split()[:5] 
     safe_words = [re.sub(r'[^a-zA-Z0-9_]', '', word) for word in words]  
     filename = "_".join(safe_words).lower() + ".png"
-    filepath = os.path.join(os.getcwd(), filename)
+    
+    # Get story folder path
+    story_folder = os.getenv('CURRENT_STORY_FOLDER', os.getcwd())
+    filepath = os.path.join(story_folder, filename)
 
     # Download the image from the URL
     image_response = requests.get(image_url)
@@ -170,7 +247,7 @@ def generateimage(chapter_content_and_character_details: str | dict) -> str:
 @tool
 def convermarkdowntopdf(markdownfile_name: str) -> str:
     """
-    Converts a Markdown file to a PDF document using xhtml2pdf.
+    Converts a Markdown file to a PDF document and saves it in the story folder
     """
     import markdown2
     from xhtml2pdf import pisa
@@ -179,7 +256,8 @@ def convermarkdowntopdf(markdownfile_name: str) -> str:
     from datetime import datetime
     
     date_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output_file = os.path.splitext(markdownfile_name)[0] + story_config.theme + "-" + date_now + '.pdf'
+    story_folder = os.getenv('CURRENT_STORY_FOLDER', os.getcwd())
+    output_file = os.path.join(story_folder, f"cuento_{story_config.theme}_{date_now}.pdf")
     
     # Leer el contenido del Markdown
     with open(markdownfile_name, 'r', encoding='utf-8') as md_file:
@@ -281,147 +359,130 @@ def markdown_to_pdf(markdownfile_name, output_file):
 
         return output_file
 
-
-@tool
-def newconvermarkdowntopdf(markdownfile_name: str) -> str:
+def create_agents_and_tasks():
     """
-    Converts a Markdown file to a PDF document using the MarkdownPdf python library.
-
-    Args:
-        markdownfile_name (str): Path to the input Markdown file.
-
-    Returns:
-        str: Path to the generated PDF file.
+    Creates agents and tasks with current story configuration
     """
+    story_outliner = Agent(
+        role='Creador de Esquema',
+        goal=f"Desarrollar un esquema para un libro infantil sobre {story_config.theme}, incluyendo títulos de capítulos y personajes para {story_config.num_chapters} capítulos.",
+        backstory="Un creador imaginativo que establece las bases de historias cautivadoras para niños.",
+        verbose=True,
+        llm=llm,
+        allow_delegation=False
+    )
 
-    date_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # Formato: YYYY-MM-DD_HH-MM-SS
+    story_writer = Agent(
+        role='Escritor de Historia',
+        goal=f'Escribir el contenido completo de la historia para los {story_config.num_chapters} capítulos, cada capítulo con {story_config.words_per_chapter} palabras, entrelazando las narrativas y los personajes descritos.',
+        backstory="Un narrador talentoso que da vida al mundo y los personajes esbozados, creando cuentos imaginativos y atractivos para niños.",
+        verbose=True,
+        llm=llm,
+        allow_delegation=False
+    )
 
-    output_file = os.path.splitext(markdownfile_name)[0] + story_config.theme + "-" + date_now + '.pdf'
+    image_generator = Agent(
+        role='Generador de Imágenes',
+        goal=f'Generar una imagen por cada contenido de capítulo proporcionado por el creador del esquema. Comenzar con el número del capítulo, contenido del capítulo, detalles de los personajes, información detallada de la ubicación y elementos detallados en el lugar donde ocurre la actividad. Generar un total de {story_config.num_chapters} imágenes una por una. La salida final debe contener todas las {story_config.num_chapters} imágenes en formato json.',
+        backstory="Una IA creativa especializada en narración visual, dando vida a cada capítulo a través de imágenes imaginativas.",
+        verbose=True,
+        llm=llm,
+        tools=[generateimage],
+        allow_delegation=False
+    )
 
-    with open(markdownfile_name, 'r', encoding='utf-8') as md_file:
-            markdown_content = md_file.read()
+    content_formatter = Agent(
+        role='Formateador de Contenido',
+        goal='Formatear el contenido escrito de la historia en markdown, incluyendo imágenes al principio de cada capítulo.',
+        backstory='Un formateador meticuloso que mejora la legibilidad y presentación del libro de cuentos.',
+        verbose=True,
+        llm=llm,
+        tools=[file_read_tool],
+        allow_delegation=False
+    )
 
-    #--------------------
-    pdf = MarkdownPdf(toc_level=2)
-    pdf.meta["title"] = story_config.theme
-    pdf.add_section(Section(markdown_content, toc=False))
-    pdf.save(output_file)
+    markdown_to_pdf_creator = Agent(
+        role='Conversor a PDF',
+        goal='Convertir el archivo Markdown a un documento PDF. story.md es el nombre del archivo markdown.',
+        backstory='Un conversor eficiente que transforma archivos Markdown en documentos PDF profesionalmente formateados.',
+        verbose=True,
+        llm=llm,
+        tools=[convermarkdowntopdf],
+        allow_delegation=False
+    )
 
+    task_outline = Task(
+        description=f"Crear un esquema para el libro infantil sobre {story_config.theme}, detallando títulos de capítulos y descripciones de personajes para {story_config.num_chapters} capítulos.",
+        agent=story_outliner,
+        expected_output=f'Un documento estructurado que contiene {story_config.num_chapters} títulos de capítulos, con descripciones detalladas de personajes y los puntos principales de la trama para cada capítulo.'
+    )
 
-        
-    return output_file
+    task_write = Task(
+        description=f'Usando el esquema proporcionado, escribir el contenido completo de la historia para todos los capítulos, asegurando una narrativa cohesiva y atractiva para niños. Cada capítulo con {story_config.words_per_chapter} palabras. Incluir el título de la historia al principio.',
+        agent=story_writer,
+        expected_output=f"Un manuscrito completo del libro infantil sobre {story_config.theme} con {story_config.num_chapters} capítulos. Cada capítulo debe contener aproximadamente {story_config.words_per_chapter} palabras, siguiendo el esquema proporcionado e integrando los personajes y puntos de trama en una narrativa cohesiva."
+    )
 
+    task_image_generate = Task(
+        description=f"Generar {story_config.num_chapters} imágenes que capturen la esencia del libro infantil sobre {story_config.theme}, alineándose con los temas, personajes y narrativa descritos para los capítulos. Hacerlo uno por uno.",
+        agent=image_generator,
+        expected_output=f'Un archivo de imagen digital que representa visualmente el tema general del libro infantil, incorporando elementos de los personajes y la trama según se describe en el esquema. La imagen debe ser adecuada para su inclusión en el libro como ilustración.',
+    )
 
+    task_format_content = Task(
+        description='Formatear el contenido de la historia en markdown, incluyendo una imagen al principio de cada capítulo.',
+        agent=content_formatter,
+        expected_output='Todo el contenido del libro formateado en markdown, con cada título de capítulo seguido por la imagen correspondiente y el contenido del capítulo. Eliminar la sintaxis ```markdown de la salida',
+        context=[task_write, task_image_generate],
+        output_file="story.md"
+    )
 
-story_outliner = Agent(
-    role='Story Outliner',
-    goal=f"Develop an outline for a children's storybook about {story_config.theme}, including chapter titles and characters for {story_config.num_chapters} chapters.",
-    backstory="An imaginative creator who lays the foundation of captivating stories for children.",
-    verbose=True,
-    llm=llm,
-    allow_delegation=False
-)
+    task_markdown_to_pdf = Task(
+        description='Convertir un archivo Markdown a un documento PDF, asegurando la preservación del formato, estructura e imágenes incrustadas usando la biblioteca mdpdf.',
+        agent=markdown_to_pdf_creator,
+        expected_output='Un archivo PDF generado desde el Markdown de entrada, reflejando con precisión el contenido con el formato adecuado. El PDF debe estar listo para compartir o imprimir.'
+    )
 
-story_writer = Agent(
-    role='Story Writer',
-    goal=f'Write the full content of the story for all {story_config.num_chapters} chapters, each chapter {story_config.words_per_chapter} words, weaving together the narratives and characters outlined.',
-    backstory="A talented storyteller who brings to life the world and characters outlined, crafting engaging and imaginative tales for children.",
-    verbose=True,
-    llm=llm,
-    allow_delegation=False
-)
-
-image_generator = Agent(
-    role='Image Generator',
-    goal=f'Generate one image per chapter content provided by the story outliner. Start with Chapter number, chapter content, character details, detailed location information and detailed items in the location where the activity happens. Generate totally {story_config.num_chapters} images one by one. Final output should contain all the {story_config.num_chapters} images in json format.',
-    backstory="A creative AI specialized in visual storytelling, bringing each chapter to life through imaginative imagery.",
-    verbose=True,
-    llm=llm,
-    tools=[generateimage],
-    allow_delegation=False
-)
-
-content_formatter = Agent(
-    role='Content Formatter',
-    goal='Format the written story content in markdown, including images at the beginning of each chapter.',
-    backstory='A meticulous formatter who enhances the readability and presentation of the storybook.',
-    verbose=True,
-    llm=llm,
-    tools=[file_read_tool],
-    allow_delegation=False
-)
-
-markdown_to_pdf_creator = Agent(
-    role='PDF Converter',
-    goal='Convert the Markdown file to a PDF document. story.md is the markdown file name.',
-    backstory='An efficient converter that transforms Markdown files into professionally formatted PDF documents.',
-    verbose=True,
-    llm=llm,
-    tools=[convermarkdowntopdf],  # newconvermarkdowntopdf
-    allow_delegation=False
-)
-
-
-# Create tasks for the agents
-task_outline = Task(
-    description=f"Create an outline for the children's storybook about {story_config.theme}, detailing chapter titles and character descriptions for {story_config.num_chapters} chapters.",
-    agent=story_outliner,
-    expected_output=f'A structured outline document containing {story_config.num_chapters} chapter titles, with detailed character descriptions and the main plot points for each chapter.'
-)
-
-task_write = Task(
-    description=f'Using the outline provided, write the full story content for all chapters, ensuring a cohesive and engaging narrative for children. Each Chapter {story_config.words_per_chapter} words. Include Title of the story at the top.',
-    agent=story_writer,
-    expected_output=f"A complete manuscript of the children's storybook about {story_config.theme} with {story_config.num_chapters} chapters. Each chapter should contain approximately {story_config.words_per_chapter} words, following the provided outline and integrating the characters and plot points into a cohesive narrative."
-)
-
-task_image_generate = Task(
-    description=f"Generate {story_config.num_chapters} images that captures the essence of the children's storybook about {story_config.theme}, aligning with the themes, characters, and narrative outlined for the chapters. Do it one by one.",
-    agent=image_generator,
-    expected_output=f'A digital image file that visually represents the overarching theme of the children\'s storybook, incorporating elements from the characters and plot as described in the outline. The image should be suitable for inclusion in the storybook as an illustration.',
-)
-
-task_format_content = Task(
-    description='Format the story content in markdown, including an image at the beginning of each chapter.',
-    agent=content_formatter,
-    expected_output='The entire storybook content formatted in markdown, with each chapter title followed by the corresponding image and the chapter content. remove the  ```markdown sintax from the output',
-    context=[task_write, task_image_generate],
-    output_file="story.md"
-)
-
-task_markdown_to_pdf = Task(
-    description='Convert a Markdown file to a PDF document, ensuring the preservation of formatting, structure, and embedded images using the mdpdf library.',
-    agent=markdown_to_pdf_creator,
-    expected_output='A PDF file generated from the Markdown input, accurately reflecting the content with proper formatting. The PDF should be ready for sharing or printing.'
-)
+    return {
+        'agents': [story_outliner, story_writer, image_generator, content_formatter, markdown_to_pdf_creator],
+        'tasks': [task_outline, task_write, task_image_generate, task_format_content, task_markdown_to_pdf]
+    }
 
 def generate_story(theme=None, num_chapters=None, words_per_chapter=None):
     """
-    Generate a story with custom parameters
-    Args:
-        theme (str): Theme of the story
-        num_chapters (int): Number of chapters
-        words_per_chapter (int): Words per chapter
-    Returns:
-        str: Result of the story generation process
+    Generate a story with custom parameters and organize files in a dedicated folder
     """
+    # Configure story parameters first
     configure_story(theme, num_chapters, words_per_chapter)
     
+    # Create story folder and set it as environment variable
+    story_folder = create_story_folder(story_config.theme)
+    os.environ['CURRENT_STORY_FOLDER'] = story_folder
+    
+    # Create agents and tasks with updated configuration
+    crew_config = create_agents_and_tasks()
+    
     crew = Crew(
-        agents=[story_outliner, story_writer, image_generator, content_formatter, markdown_to_pdf_creator],
-        tasks=[task_outline, task_write, task_image_generate, task_format_content, task_markdown_to_pdf],
+        agents=crew_config['agents'],
+        tasks=crew_config['tasks'],
         verbose=True,
         process=Process.sequential
     )
     
-    return crew.kickoff()
+    result = crew.kickoff()
+    
+    # Clean up environment variable
+    os.environ.pop('CURRENT_STORY_FOLDER', None)
+    
+    return result
 
 if __name__ == "__main__":
-    # Example usage
+    print(f"Tema inicial: {story_config.theme}")
     result = generate_story(
-        theme="Space Adventure",
-        num_chapters=10,
-        words_per_chapter=50
+        theme="El infinito",
+        num_chapters=1,
+        words_per_chapter=3
     )
+    print(f"Tema después de configurar: {story_config.theme}")
     print(result)
 
