@@ -11,6 +11,7 @@ from spire.doc import *
 from spire.doc.common import *
 import markdown2
 from markdown_pdf import MarkdownPdf, Section
+from pdf_styles import PDFStyle
 
 
 
@@ -41,6 +42,7 @@ class StoryConfig:
             self._num_chapters = 5
             self._words_per_chapter = 50
             self._initialized = True
+            self._pdf_style = PDFStyle()
             print(f"StoryConfig initialized with theme: {self._theme}")
 
     @property
@@ -73,6 +75,10 @@ class StoryConfig:
             self._words_per_chapter = value
             print(f"Words per chapter updated to: {self._words_per_chapter}")
 
+    @property
+    def pdf_style(self):
+        return self._pdf_style
+
 # Create a global config instance
 story_config = StoryConfig()
 
@@ -103,14 +109,16 @@ def create_story_folder(theme):
     Creates a folder structure for storing story files
     Returns the path to the new story folder
     """
+    def sanitize_filename(filename):
+        clean_name = re.sub(r'[^a-zA-Z0-9]', '_', filename)
+        return clean_name[:50]
+
     base_folder = "CuentosGenerados"
-    date_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # Clean theme name for folder name
-    clean_theme = re.sub(r'[^a-zA-Z0-9_]', '_', theme)
-    story_folder = f"{clean_theme}_{date_now}"
+    date_now = datetime.now().strftime("%Y%m%d_%H%M%S")
+    sanitized_theme = sanitize_filename(theme)
+    story_folder = f"{sanitized_theme}_{date_now}"
     full_path = os.path.join(os.getcwd(), base_folder, story_folder)
     
-    # Create folders if they don't exist
     os.makedirs(full_path, exist_ok=True)
     
     return full_path
@@ -247,101 +255,110 @@ def generateimage(chapter_content_and_character_details: str | dict) -> str:
 @tool
 def convermarkdowntopdf(markdownfile_name: str) -> str:
     """
-    Converts a Markdown file to a PDF document and saves it in the story folder
+    Converts a Markdown file to a PDF document using configured styles
+    Args:
+        markdownfile_name: Path to the markdown file
+    Returns:
+        str: Path to the generated PDF file
     """
-    import markdown2
     from xhtml2pdf import pisa
-    from bs4 import BeautifulSoup
-    import base64
+    import markdown2
+    import os
     from datetime import datetime
-    
-    date_now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    story_folder = os.getenv('CURRENT_STORY_FOLDER', os.getcwd())
-    output_file = os.path.join(story_folder, f"cuento_{story_config.theme}_{date_now}.pdf")
-    
-    # Leer el contenido del Markdown
-    with open(markdownfile_name, 'r', encoding='utf-8') as md_file:
-        markdown_content = md_file.read()
-    
-    # Convertir Markdown a HTML
-    html_content = markdown2.markdown(
-        markdown_content,
-        extras=['fenced-code-blocks', 'tables', 'header-ids', 'images']
-    )
-    
-    # Procesar imágenes
-    soup = BeautifulSoup(html_content, 'html.parser')
-    for img in soup.find_all('img'):
-        src = img.get('src')
-        if src and not src.startswith(('http://', 'https://', 'data:')):
-            absolute_path = os.path.abspath(os.path.join(os.path.dirname(markdownfile_name), src))
-            if os.path.exists(absolute_path):
-                with open(absolute_path, 'rb') as img_file:
-                    img_data = base64.b64encode(img_file.read()).decode('utf-8')
-                    img['src'] = f'data:image/png;base64,{img_data}'
-    
-    html_content = str(soup)
-    
-    # CSS para el diseño
-    css = '''
-        @page {
-            size: A4;
-            margin: 2cm;
-        }
-        body {
-            font-family: Helvetica, Arial, sans-serif;
-            font-size: 12pt;
-            line-height: 1.6;
-        }
-        h1 {
-            font-size: 24pt;
-            color: #2c3e50;
-            text-align: center;
-            margin-bottom: 20pt;
-        }
-        h2 {
-            font-size: 18pt;
-            color: #34495e;
-            margin-top: 16pt;
-        }
-        img {
-            max-width: 90%;
-            margin: 20pt auto;
-            display: block;
-        }
-        p {
-            text-align: justify;
-            margin-bottom: 10pt;
-        }
-    '''
-    
-    # HTML completo con CSS
-    html = f'''
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>{css}</style>
-        </head>
-        <body>
-            {html_content}
-        </body>
-        </html>
-    '''
-    
-    # Convertir HTML a PDF
-    with open(output_file, "wb") as pdf_file:
-        pisa_status = pisa.CreatePDF(
-            html,
-            dest=pdf_file,
-            encoding='utf-8'
-        )
-    
-    if pisa_status.err:
-        print('Error al generar el PDF')
+    import re
+
+    try:
+        # Verify markdown file exists
+        if not os.path.exists(markdownfile_name):
+            print(f"Error: File not found - {markdownfile_name}")
+            return ""
+
+        # Create sanitized output filename
+        date_now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        clean_theme = re.sub(r'[^a-zA-Z0-9]', '_', story_config.theme)[:50]
+        story_folder = os.getenv('CURRENT_STORY_FOLDER', os.getcwd())
+        output_file = os.path.join(story_folder, f"cuento_{clean_theme}_{date_now}.pdf")
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+        # Convert markdown to HTML with styling
+        with open(markdownfile_name, 'r', encoding='utf-8') as md_file:
+            html_content = markdown2.markdown(md_file.read())
+
+        # CSS template using story_config.pdf_style values
+        css = f"""
+            @page {{ 
+                size: A4; 
+                margin: 2.5cm; 
+            }}
+            body {{ 
+                font-family: {story_config.pdf_style.fonts['body']}, sans-serif; 
+                font-size: {story_config.pdf_style.sizes['body']}; 
+                line-height: {story_config.pdf_style.sizes['spacing']}; 
+                color: {story_config.pdf_style.color_scheme['text']};
+                background-color: {story_config.pdf_style.color_scheme['background']};
+            }}
+            h1 {{ 
+                font-family: {story_config.pdf_style.fonts['title']}, serif;
+                font-size: {story_config.pdf_style.sizes['title']};
+                color: {story_config.pdf_style.color_scheme['primary']};
+                text-align: center; 
+                margin: 2cm 0 1cm 0;
+                padding-bottom: 0.5cm;
+            }}
+            h2 {{ 
+                font-family: {story_config.pdf_style.fonts['heading']}, sans-serif;
+                font-size: {story_config.pdf_style.sizes['chapter']};
+                color: {story_config.pdf_style.color_scheme['secondary']};
+                page-break-before: always;
+                margin-top: 1cm;
+                padding-bottom: 0.3cm;
+                border-bottom: 1px solid {story_config.pdf_style.color_scheme['accent']};
+            }}
+            img {{ 
+                max-width: 80%; 
+                display: block; 
+                margin: 1cm auto;
+                page-break-inside: avoid;
+            }}
+            p {{ 
+                text-align: justify; 
+                margin-bottom: 0.5cm;
+                font-family: {story_config.pdf_style.fonts['body']}, sans-serif;
+            }}
+        """
+
+        # Create complete HTML document
+        html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>{css}</style>
+            </head>
+            <body>{html_content}</body>
+            </html>
+        """
+
+        # Convert to PDF
+        with open(output_file, "wb") as pdf_file:
+            pisa_status = pisa.CreatePDF(
+                html,
+                dest=pdf_file,
+                encoding='utf-8'
+            )
+
+        if pisa_status.err:
+            print("Error creating PDF")
+            return ""
+
+        print(f"PDF generated successfully: {output_file}")
+        return output_file
+
+    except Exception as e:
+        print(f"Error in PDF generation: {str(e)}")
         return ""
-    
-    print(f"PDF generado con éxito: {output_file}")
-    return output_file
 
 # HElper function to convert markdown to pdf
 def markdown_to_pdf(markdownfile_name, output_file):
@@ -476,12 +493,36 @@ def generate_story(theme=None, num_chapters=None, words_per_chapter=None):
     
     return result
 
+# Example usage in main
 if __name__ == "__main__":
-    print(f"Tema inicial: {story_config.theme}")
+    # Configure PDF style
+    story_config.pdf_style.update_colors(
+        primary='#2c3e50',    # Dark blue
+        secondary='#34495e',   # Medium blue
+        accent='#e74c3c',      # Red accent
+        background='#ffffff',  # White
+        text='#2c3e50'        # Dark blue for text
+    )
+
+    story_config.pdf_style.update_fonts(
+        main='Arial',
+        title='Arial',
+        heading='Arial',
+        body='Arial'
+    )
+
+    story_config.pdf_style.update_sizes(
+        title='28pt',
+        chapter='22pt',
+        body='12pt',
+        spacing='1.6'
+    )
+
+    # Generate story
     result = generate_story(
-        theme="El infinito",
-        num_chapters=1,
-        words_per_chapter=3
+        theme="ADN de dragón",
+        num_chapters=2,
+        words_per_chapter=150
     )
     print(f"Tema después de configurar: {story_config.theme}")
     print(result)
