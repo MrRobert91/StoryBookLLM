@@ -14,6 +14,7 @@ from markdown_pdf import MarkdownPdf, Section
 from pdf_styles import PDFStyle
 from .story_config import StoryConfig
 from .config import CUENTOS_DIR
+from .logger import logger
 
 '''
 
@@ -220,6 +221,9 @@ def generateimage(prompt: str | dict) -> str:
         import re
         from .config import IMAGENES_DIR
 
+        logger.info("Starting image generation")
+        logger.debug(f"Image prompt: {prompt}")
+
         # Process prompt if it's a dictionary
         if isinstance(prompt, dict):
             # Extract relevant information from the dictionary
@@ -269,14 +273,14 @@ def generateimage(prompt: str | dict) -> str:
         if response.status_code == 200:
             with open(output_file, 'wb') as f:
                 f.write(response.content)
-            print(f"Image saved successfully at: {output_file}")
+            logger.info(f"Image generated successfully at: {output_file}")
             return output_file
         else:
             print("Failed to download image")
             return ""
 
     except Exception as e:
-        print(f"Error generating image: {str(e)}")
+        logger.exception("Error during image generation")
         return ""
 
 @tool
@@ -293,6 +297,8 @@ def convermarkdowntopdf(markdownfile_name: str) -> str:
         import os
         from .config import CUENTOS_DIR  # Import the correct path from config
         import re
+
+        logger.info(f"Starting PDF conversion for: {markdownfile_name}")
 
         # Verify input file exists
         if not os.path.exists(markdownfile_name):
@@ -384,11 +390,11 @@ def convermarkdowntopdf(markdownfile_name: str) -> str:
             print("Error creating PDF")
             return ""
 
-        print(f"PDF generated successfully at: {output_file}")
+        logger.info(f"PDF generated successfully at: {output_file}")
         return output_file
 
     except Exception as e:
-        print(f"Error in PDF generation: {str(e)}")
+        logger.exception("Error during PDF conversion")
         return ""
 
 # HElper function to convert markdown to pdf
