@@ -208,7 +208,7 @@ def generateimageold(chapter_content_and_character_details: str) -> str:
 '''
 
 @tool
-def generateimage(prompt: str) -> str:
+def generateimage(prompt: str | dict) -> str:
     """
     Generates an image and saves it in a theme-specific folder within static/ImagenesGeneradas
     """
@@ -220,7 +220,23 @@ def generateimage(prompt: str) -> str:
         import re
         from .config import IMAGENES_DIR
 
-        # Create theme-specific directory name (same as PDF folder name)
+        # Process prompt if it's a dictionary
+        if isinstance(prompt, dict):
+            # Extract relevant information from the dictionary
+            prompt_text = prompt.get('description', '') if 'description' in prompt else str(prompt)
+        else:
+            prompt_text = str(prompt)
+
+        # Add style guidelines to the prompt
+        dalle_prompt = f"""Image is about: {prompt_text}. 
+        Style: Illustration. Create an illustration incorporating a vivid palette 
+        with an emphasis on shades of azure and emerald, augmented by splashes 
+        of gold for contrast and visual interest. The style should evoke the 
+        intricate detail and whimsy of early 20th-century storybook illustrations, 
+        blending realism with fantastical elements. DON'T include ANY text or 
+        colour palettes in this image."""
+
+        # Create theme-specific directory name
         date_now = datetime.now().strftime("%Y%m%d_%H%M%S")
         sanitized_theme = re.sub(r'[^a-zA-Z0-9]', '_', story_config.theme)[:30]
         theme_folder_name = f"cuento_{sanitized_theme}_{date_now}"
@@ -230,17 +246,18 @@ def generateimage(prompt: str) -> str:
         os.makedirs(theme_image_dir, exist_ok=True)
         
         # Create image filename
-        sanitized_prompt = re.sub(r'[^a-zA-Z0-9]', '_', prompt)[:30]
+        sanitized_prompt = re.sub(r'[^a-zA-Z0-9]', '_', prompt_text[:30])
         image_filename = f"imagen_{sanitized_prompt}_{date_now}.png"
         output_file = os.path.join(theme_image_dir, image_filename)
         
         print(f"Generating image at: {output_file}")
+        print(f"Using prompt: {dalle_prompt[:200]}...")
 
         # Generate image using OpenAI
         client = OpenAI()
         response = client.images.generate(
             model="dall-e-3",
-            prompt=prompt,
+            prompt=dalle_prompt,
             size="1024x1024",
             quality="standard",
             n=1,
