@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from .models import StoryRequest, StoryResponse
-from .story_generator import generate_story
-from .config import STATIC_DIR
-from .logger import logger
+from app.models import StoryRequest, StoryResponse  # Changed from relative import
+from app.story_generator import generate_story      # Changed from relative import
+from app.config import STATIC_DIR, CUENTOS_DIR      # Changed from relative import
+from app.logger import logger                      # Changed from relative import
 import os
 import uvicorn
 
@@ -26,7 +26,7 @@ async def create_story(request: StoryRequest):
         logger.info(f"Starting story generation with theme: {request.theme}")
         logger.debug(f"Parameters - Chapters: {request.num_chapters}, Words per chapter: {request.words_per_chapter}")
         
-        result = generate_story(
+        pdf_file_path, result = generate_story(
             theme=request.theme,
             num_chapters=request.num_chapters,
             words_per_chapter=request.words_per_chapter
@@ -40,30 +40,27 @@ async def create_story(request: StoryRequest):
             )
 
         # Verify file exists
-        if not os.path.exists(result):
-            logger.error(f"Generated PDF file not found at: {result}")
+        #if not os.path.exists(result):
+        if not os.path.exists(pdf_file_path):
+            logger.error(f"Generated PDF file not found")
             raise HTTPException(
                 status_code=500,
                 detail="Generated PDF file not found"
             )
         
-        # Get the relative path from STATIC_DIR
         try:
-            rel_path = os.path.relpath(result, STATIC_DIR)
-            pdf_url = f"/static/{rel_path.replace(os.sep, '/')}"
-            
-            logger.info(f"Story generated successfully - File: {result}")
-            logger.debug(f"PDF URL: {pdf_url}")
+
+            os.path.exists(pdf_file_path)
             
             return StoryResponse(
-                pdf_url=pdf_url,
+                pdf_url=pdf_file_path,
                 message="Story generated successfully"
             )
         except Exception as path_error:
             logger.error(f"Error processing file path: {str(path_error)}")
             # Return the successful response even if path processing fails
             return StoryResponse(
-                pdf_url=f"/static/CuentosGenerados/{os.path.basename(result)}",
+                pdf_url=f"/static/CuentosGenerados/{os.path.basename(pdf_file_path)}",
                 message="Story generated successfully (path processing warning)"
             )
     

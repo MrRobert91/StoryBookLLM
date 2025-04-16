@@ -110,6 +110,64 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 For questions and support, please open an issue in the GitHub repository.
 
+# StoryBook API Documentation
+
+## Generate Story Endpoint
+
+### Endpoint Details
+- **URL**: `http://localhost:8000/api/generate-story`
+- **Method**: `POST`
+- **Content-Type**: `application/json`
+
+### Request Body
+```json
+{
+    "theme": "string",
+    "num_chapters": integer,
+    "words_per_chapter": integer
+}
+```
+
+### Example Request
+
+Using cURL:
+```bash
+curl -X POST http://localhost:8000/api/generate-story \
+-H "Content-Type: application/json" \
+-d "{\"theme\":\"space adventure\",\"num_chapters\":3,\"words_per_chapter\":200}"
+```
+
+Using Python:
+```python
+import requests
+
+url = "http://localhost:8000/api/generate-story"
+data = {
+    "theme": "space adventure",
+    "num_chapters": 3,
+    "words_per_chapter": 200
+}
+
+response = requests.post(url, json=data)
+print(response.json())
+```
+
+### Response Format
+```json
+{
+    "pdf_url": "string",
+    "message": "string"
+}
+```
+
+### Interactive Documentation
+You can also test the API using the Swagger UI:
+1. Open your browser and navigate to `http://localhost:8000/docs`
+2. Click on the `/api/generate-story` endpoint
+3. Click "Try it out"
+4. Enter your parameters in the request body
+5. Click "Execute"
+
 ---
 
 Made with ❤️ by [Your Name]

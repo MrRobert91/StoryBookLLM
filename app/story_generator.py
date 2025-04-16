@@ -119,7 +119,7 @@ def configure_story(theme=None, num_chapters=None, words_per_chapter=None):
     
     print(f"Final theme: {story_config.theme}")
     return story_config
-
+#Esta fiuncion NO crea la carpeta, pensar en quitarla
 def create_story_folder(theme):
     """
     Creates a folder structure for storing story files
@@ -129,15 +129,18 @@ def create_story_folder(theme):
         clean_name = re.sub(r'[^a-zA-Z0-9]', '_', filename)
         return clean_name[:50]
 
-    base_folder = "CuentosGenerados"
+    base_folder = "static\\CuentosGenerados"
     date_now = datetime.now().strftime("%Y%m%d_%H%M%S")
     sanitized_theme = sanitize_filename(theme)
     story_folder = f"{sanitized_theme}_{date_now}"
+    pdf_file_name = f"cuento_{story_folder}.pdf"
+    pdf_file_path = os.path.join(base_folder, pdf_file_name)
     full_path = os.path.join(os.getcwd(), base_folder, story_folder)
     
-    os.makedirs(full_path, exist_ok=True)
+     
+    #os.makedirs(full_path, exist_ok=True)
     
-    return full_path
+    return pdf_file_path, full_path
 
 llm = ChatOpenAI(
     openai_api_base="https://api.openai.com/v1", # https://api.openai.com/v1 or https://api.groq.com/openai/v1 
@@ -510,7 +513,8 @@ def generate_story(theme=None, num_chapters=None, words_per_chapter=None):
     configure_story(theme, num_chapters, words_per_chapter)
     
     # Create story folder and set it as environment variable
-    story_folder = create_story_folder(story_config.theme)
+    #Creo que esto de crear carpetas no sirve de nada
+    pdf_file_name, story_folder = create_story_folder(story_config.theme)
     os.environ['CURRENT_STORY_FOLDER'] = story_folder
     
     # Create agents and tasks with updated configuration
@@ -522,13 +526,15 @@ def generate_story(theme=None, num_chapters=None, words_per_chapter=None):
         verbose=True,
         process=Process.sequential
     )
-    
+    #Si devolvemos tambien la story_folder podemos usar eso para luego compararla y que no sea la salida de crew.kikof que no se que es. 
+
     result = crew.kickoff()
     
     # Clean up environment variable
     os.environ.pop('CURRENT_STORY_FOLDER', None)
     
-    return result
+    # devolvemos tambien el path creado para el cuento 
+    return pdf_file_name, result
 
 # Example usage in main
 if __name__ == "__main__":
