@@ -9,3 +9,7 @@ xhtml2pdf
 beautifulsoup4
 reportlab
 python-dotenv
+fastapi
+uvicorn
+pytest
+httpx
