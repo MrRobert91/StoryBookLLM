@@ -23,7 +23,7 @@ The system uses multiple AI agents working in concert:
 ## 📋 Requirements
 
 ```bash
-pip install -r requirements.txt
+-s -a
 ```
 
 Required Python packages:
