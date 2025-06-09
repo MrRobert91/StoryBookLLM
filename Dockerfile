@@ -10,12 +10,19 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
+# Copy only requirements first to leverage Docker cache
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy only necessary application code
+COPY app ./app
+COPY static ./static
+
+# Create necessary directories
+RUN mkdir -p static/CuentosGenerados static/ImagenesGeneradas
+
+# Set permissions
+RUN chmod -R 755 static
 
 # Expose port
 EXPOSE 8000
