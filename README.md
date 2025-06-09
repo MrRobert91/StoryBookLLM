@@ -53,6 +53,21 @@ OPENAI_API_KEY=your_api_key_here
 python storyGenerator.py --theme "Space Adventure"
 ```
 
+## 🐳 Docker
+
+You can also run the API using Docker:
+
+```bash
+# Build the image
+docker build -t storybook-api .
+
+# Run the container (exposes port 8000)
+docker run -p 8000:8000 -e OPENAI_API_KEY=your_api_key_here storybook-api
+
+# O bien carga la clave desde un archivo `.env`
+docker run --env-file .env -p 8000:8000 storybook-api
+```
+
 ## 📖 Usage
 
 ```python
